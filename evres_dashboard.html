@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EVRES ML Brain</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --c1:#0f172a;--c2:#1e293b;--c3:#334155;
+  --acc:#22d3ee;--acc2:#a78bfa;--acc3:#4ade80;--acc4:#f87171;--acc5:#fbbf24;
+  --txt:#e2e8f0;--txt2:#94a3b8;--bdr:#334155;
+  --radius:10px;
+}
+html,body{height:100%;overflow-x:hidden}
+body{
+  font-family:'Courier New',monospace;font-size:13px;
+  color:var(--txt);background:var(--c1);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ── HEADER ─────────────────── */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:var(--c2);
+  border-bottom:1px solid var(--bdr);position:sticky;top:0;z-index:10;
+}
+.header-title{font-size:11px;letter-spacing:1.5px;color:var(--acc);font-weight:700}
+.header-sub{font-size:9px;color:var(--txt2);margin-top:2px;letter-spacing:1px}
+.badge{font-size:9px;padding:3px 8px;border-radius:20px;background:rgba(74,222,128,.15);color:var(--acc3);border:1px solid rgba(74,222,128,.3);letter-spacing:.5px}
+.badge.warn{background:rgba(248,113,113,.15);color:var(--acc4);border-color:rgba(248,113,113,.3)}
+
+/* ── SCROLL CONTAINER ───────── */
+.scroll{overflow-y:auto;height:calc(100vh - 54px);padding:10px}
+
+/* ── CARDS ──────────────────── */
+.card{background:var(--c2);border:1px solid var(--bdr);border-radius:var(--radius);padding:12px;margin-bottom:10px}
+.card-label{font-size:9px;letter-spacing:2px;color:var(--acc);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+
+/* ── METRICS GRID ───────────── */
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.metric{background:var(--c1);border-radius:8px;padding:10px;border:1px solid var(--bdr)}
+.metric-val{font-size:20px;font-weight:700;color:var(--acc);line-height:1}
+.metric-lbl{font-size:9px;color:var(--txt2);margin-top:4px;letter-spacing:.5px}
+
+/* ── BAR ────────────────────── */
+.bar-row{margin-top:8px}
+.bar-lbl{font-size:9px;color:var(--txt2);margin-bottom:4px;display:flex;justify-content:space-between}
+.bar-bg{height:6px;background:var(--c1);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.bar-c{background:var(--acc)}.bar-g{background:var(--acc3)}.bar-w{background:var(--acc4)}
+
+/* ── STATUS ROW ─────────────── */
+.status-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--txt2);margin-top:8px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-g{background:var(--acc3)}.dot-r{background:var(--acc4)}.dot-y{background:var(--acc5)}
+
+/* ── ANOMALY ALERT ──────────── */
+.anomaly-box{
+  background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);
+  border-radius:6px;padding:7px 10px;font-size:10px;color:var(--acc4);
+  margin-top:8px;display:none
+}
+.anomaly-box.show{display:block}
+
+/* ── ACTUATORS ──────────────── */
+.actuator-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.act-btn{
+  background:var(--c1);border:1px solid var(--bdr);border-radius:8px;
+  padding:12px 8px;text-align:center;cursor:pointer;transition:all .2s;
+  -webkit-user-select:none;user-select:none
+}
+.act-btn:active{transform:scale(.96)}
+.act-icon{font-size:22px;margin-bottom:4px}
+.act-name{font-size:9px;color:var(--txt2);letter-spacing:1px}
+.act-state{font-size:10px;font-weight:700;margin-top:3px}
+.act-btn.on-r{background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.5)}
+.act-btn.on-r .act-state{color:var(--acc4)}
+.act-btn.on-g{background:rgba(74,222,128,.15);border-color:rgba(74,222,128,.5)}
+.act-btn.on-g .act-state{color:var(--acc3)}
+.act-btn.on-b{background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.5)}
+.act-btn.on-b .act-state{color:var(--acc)}
+
+/* ── ML MODES ───────────────── */
+.modes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.mode-btn{
+  font-size:10px;padding:6px 12px;border-radius:6px;
+  border:1px solid var(--bdr);background:var(--c1);color:var(--txt2);
+  cursor:pointer;letter-spacing:1px;transition:all .15s;font-family:'Courier New',monospace;
+  -webkit-user-select:none;user-select:none
+}
+.mode-btn:active{transform:scale(.96)}
+.mode-btn.active{background:rgba(34,211,238,.15);border-color:var(--acc);color:var(--acc)}
+
+/* ── TINYML ─────────────────── */
+.tml-class{font-size:28px;font-weight:700;letter-spacing:3px;color:var(--acc2);margin:4px 0}
+.conf-bar{display:flex;gap:3px;margin-top:6px}
+.conf-seg{height:5px;border-radius:3px;flex:1;background:var(--c1);transition:background .3s}
+.conf-seg.lit{background:var(--acc2)}
+
+/* ── Q TABLE ─────────────────── */
+.q-table{width:100%;border-collapse:collapse;font-size:10px;margin-top:8px}
+.q-table th,.q-table td{padding:5px 4px;text-align:center;border:1px solid var(--bdr)}
+.q-table th{background:var(--c1);color:var(--acc);font-size:9px;letter-spacing:1px}
+.q-table td{color:var(--txt);background:var(--c2)}
+.q-pos{color:#4ade80}.q-neg{color:#f87171}.q-hi{font-weight:700}
+
+/* ── LOG ─────────────────────── */
+.log{background:var(--c1);border-radius:8px;padding:8px 10px;height:130px;overflow-y:auto;border:1px solid var(--bdr);margin-top:6px}
+.log-line{font-size:10px;line-height:1.7;color:var(--txt2)}
+.ts{color:var(--c3)}
+.t-nlp{color:#a78bfa}.t-rl{color:#22d3ee}.t-an{color:#f87171}.t-ml{color:#4ade80}.t-cmd{color:#fbbf24}
+
+/* ── CMD BAR ─────────────────── */
+.cmd-wrap{display:flex;gap:6px;margin-top:8px}
+.cmd-input{
+  flex:1;background:var(--c1);border:1px solid var(--bdr);border-radius:6px;
+  padding:8px 10px;color:var(--txt);font-family:'Courier New',monospace;font-size:11px;
+  outline:none;-webkit-appearance:none
+}
+.cmd-input:focus{border-color:var(--acc)}
+.cmd-send{
+  padding:8px 14px;background:rgba(34,211,238,.15);
+  border:1px solid rgba(34,211,238,.4);border-radius:6px;
+  color:var(--acc);cursor:pointer;font-family:'Courier New',monospace;
+  font-size:11px;letter-spacing:1px;white-space:nowrap;
+  -webkit-user-select:none;user-select:none
+}
+.cmd-send:active{transform:scale(.97)}
+
+/* ── REWARD BTNS ─────────────── */
+.reward-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.reward-btn{
+  flex:1;min-width:60px;padding:7px 4px;text-align:center;
+  border-radius:6px;border:1px solid var(--bdr);background:var(--c1);
+  color:var(--txt2);font-family:'Courier New',monospace;font-size:10px;
+  cursor:pointer;transition:all .15s;-webkit-user-select:none;user-select:none
+}
+.reward-btn:active{transform:scale(.96)}
+.reward-btn.pos{border-color:rgba(74,222,128,.4);color:var(--acc3)}
+.reward-btn.neg{border-color:rgba(248,113,113,.4);color:var(--acc4)}
+
+/* ── TG THEME OVERRIDE ───────── */
+.tg-theme{--c1:var(--tg-theme-bg-color,#0f172a)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">EVRES SELF-CONSCIOUS ML BRAIN</div>
+    <div class="header-sub">LIVE DASHBOARD</div>
+  </div>
+  <span class="badge" id="conn-badge">● SIMULATED</span>
+</div>
+
+<div class="scroll">
+
+  <!-- SENSOR CARD -->
+  <div class="card">
+    <div class="card-label">⬡ Sensor Input</div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-val" id="analog-val">512</div>
+        <div class="metric-lbl">ANALOG (0-1023)</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" id="z-val">0.00</div>
+        <div class="metric-lbl">Z-SCORE</div>
+      </div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-lbl"><span>ANALOG LEVEL</span><span id="analog-pct">50%</span></div>
+      <div class="bar-bg"><div class="bar-fill bar-c" id="analog-bar" style="width:50%"></div></div>
+    </div>
+    <div class="status-row">
+      <div class="dot" id="motion-dot" style="background:var(--c3)"></div>
+      <span>MOTION: <span id="motion-val">NO</span></span>
+    </div>
+    <div class="anomaly-box" id="anomaly-box">⚠ ANOMALY DETECTED — z-score exceeds 2.5σ threshold</div>
+  </div>
+
+  <!-- ACTUATORS CARD -->
+  <div class="card">
+    <div class="card-label">⬡ Actuators <span style="font-size:9px;color:var(--txt2)">(tap to toggle in MANUAL mode)</span></div>
+    <div class="actuator-grid">
+      <div class="act-btn off" id="act-ledr" onclick="toggleAct('ledR')">
+        <div class="act-icon">🔴</div>
+        <div class="act-name">LED_R</div>
+        <div class="act-state" id="st-ledr">OFF</div>
+      </div>
+      <div class="act-btn off" id="act-ledg" onclick="toggleAct('ledG')">
+        <div class="act-icon">🟢</div>
+        <div class="act-name">LED_G</div>
+        <div class="act-state" id="st-ledg">OFF</div>
+      </div>
+      <div class="act-btn off" id="act-r1" onclick="toggleAct('relay1')">
+        <div class="act-icon">⚡</div>
+        <div class="act-name">RELAY_1</div>
+        <div class="act-state" id="st-r1">OFF</div>
+      </div>
+      <div class="act-btn off" id="act-r2" onclick="toggleAct('relay2')">
+        <div class="act-icon">⚡</div>
+        <div class="act-name">RELAY_2</div>
+        <div class="act-state" id="st-r2">OFF</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ML MODE CARD -->
+  <div class="card">
+    <div class="card-label">⬡ ML Mode</div>
+    <div class="modes">
+      <button class="mode-btn" onclick="setMode('nlp')">NLP</button>
+      <button class="mode-btn" onclick="setMode('rl')">RL</button>
+      <button class="mode-btn" onclick="setMode('anomaly')">ANOMALY</button>
+      <button class="mode-btn" onclick="setMode('tinyml')">TINYML</button>
+      <button class="mode-btn" onclick="setMode('manual')">MANUAL</button>
+      <button class="mode-btn active" onclick="setMode('all')">ALL</button>
+    </div>
+  </div>
+
+  <!-- TINYML + RL CARD -->
+  <div class="card">
+    <div class="card-label">⬡ TinyML Classification</div>
+    <div class="tml-class" id="tml-class">IDLE</div>
+    <div style="font-size:9px;color:var(--txt2)">CONFIDENCE</div>
+    <div class="conf-bar" id="conf-bar">
+      <div class="conf-seg lit"></div><div class="conf-seg"></div><div class="conf-seg"></div>
+      <div class="conf-seg"></div><div class="conf-seg"></div><div class="conf-seg"></div>
+      <div class="conf-seg"></div><div class="conf-seg"></div><div class="conf-seg"></div><div class="conf-seg"></div>
+    </div>
+    <div style="height:1px;background:var(--bdr);margin:12px 0"></div>
+    <div class="card-label">⬡ RL Reward</div>
+    <div class="bar-row">
+      <div class="bar-lbl"><span>REWARD</span><span id="reward-val">0.00</span></div>
+      <div class="bar-bg"><div class="bar-fill bar-g" id="reward-bar" style="width:50%"></div></div>
+    </div>
+    <div class="status-row" style="font-size:10px">
+      State: <b id="rl-state" style="color:var(--acc)">0</b> &nbsp;
+      Action: <b id="rl-action" style="color:var(--acc2)">—</b>
+    </div>
+    <div class="card-label" style="margin-top:12px">⬡ Manual Reward Feedback</div>
+    <div class="reward-row">
+      <button class="reward-btn pos" onclick="applyReward(1.0)">+1.0</button>
+      <button class="reward-btn pos" onclick="applyReward(0.5)">+0.5</button>
+      <button class="reward-btn" onclick="applyReward(0)">0</button>
+      <button class="reward-btn neg" onclick="applyReward(-0.5)">-0.5</button>
+      <button class="reward-btn neg" onclick="applyReward(-1.0)">-1.0</button>
+    </div>
+  </div>
+
+  <!-- Q TABLE CARD -->
+  <div class="card">
+    <div class="card-label">⬡ Q-Table (RL)</div>
+    <table class="q-table">
+      <thead><tr><th>S</th><th>LED_R</th><th>LED_G</th><th>REL_1</th><th>REL_2</th></tr></thead>
+      <tbody id="q-body"></tbody>
+    </table>
+  </div>
+
+  <!-- LOG + CMD CARD -->
+  <div class="card">
+    <div class="card-label">⬡ Activity Log</div>
+    <div class="log" id="log"></div>
+    <div class="cmd-wrap">
+      <input class="cmd-input" id="cmd" placeholder="led r on / relay 1 on / mode rl / reward 0.5">
+      <button class="cmd-send" onclick="sendCmd()">SEND</button>
+    </div>
+  </div>
+
+  <div style="height:20px"></div>
+</div>
+
+<script>
+/* ── Telegram Web App init ── */
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor('#0f172a');
+  tg.setBackgroundColor('#0f172a');
+  // Show user greeting if available
+  const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+  if (user) {
+    document.getElementById('conn-badge').textContent = '● ' + (user.first_name || 'USER');
+    document.getElementById('conn-badge').classList.remove('warn');
+  }
+}
+
+/* ── STATE ── */
+const ACTIONS = ['LED_R','LED_G','REL_1','REL_2'];
+const CLASSES  = ['IDLE','ACTIVE','ALERT','OVERRIDE'];
+const C_COLORS = ['#94a3b8','#4ade80','#f87171','#a78bfa'];
+
+let S = {
+  analog:512, motion:false, anomaly:false, zScore:0,
+  ledR:false, ledG:false, relay1:false, relay2:false,
+  mode:'all',
+  qTable: Array.from({length:8}, () => Array(4).fill(0)),
+  rlState:0, rlAction:0, reward:0,
+  tmlClass:0, tmlConf:0.7,
+  patterns: [
+    {kw:'light on',  mask:0b0010},
+    {kw:'light off', mask:0b0000},
+    {kw:'relay on',  mask:0b0100},
+    {kw:'all on',    mask:0b1111},
+    {kw:'all off',   mask:0b0000},
+    {kw:'alert',     mask:0b0001},
+  ]
+};
+
+/* ── LOG ── */
+function logLine(tag, msg) {
+  const el = document.getElementById('log');
+  const ts  = new Date().toLocaleTimeString('en', {hour12:false});
+  const cls = {NLP:'t-nlp',RL:'t-rl',ANOMALY:'t-an',ML:'t-ml',CMD:'t-cmd',SYS:'t-cmd'}[tag] || 't-cmd';
+  el.innerHTML += `<div class="log-line"><span class="ts">${ts}</span> [<span class="${cls}">${tag}</span>] ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ── RENDER ── */
+function renderSensors() {
+  document.getElementById('analog-val').textContent = S.analog;
+  document.getElementById('z-val').textContent      = S.zScore.toFixed(2);
+  const pct = Math.round(S.analog / 1023 * 100);
+  document.getElementById('analog-bar').style.width = pct + '%';
+  document.getElementById('analog-pct').textContent = pct + '%';
+  document.getElementById('analog-bar').className   = 'bar-fill ' + (S.anomaly ? 'bar-w' : 'bar-c');
+  document.getElementById('motion-val').textContent  = S.motion ? 'YES' : 'NO';
+  document.getElementById('motion-dot').style.background = S.motion ? 'var(--acc3)' : 'var(--c3)';
+  const ab = document.getElementById('anomaly-box');
+  S.anomaly ? ab.classList.add('show') : ab.classList.remove('show');
+}
+
+function renderActuators() {
+  const defs = [
+    {id:'act-ledr', st:'st-ledr', key:'ledR',   on:'on-r', label:'ON'},
+    {id:'act-ledg', st:'st-ledg', key:'ledG',   on:'on-g', label:'ON'},
+    {id:'act-r1',   st:'st-r1',   key:'relay1', on:'on-b', label:'ON'},
+    {id:'act-r2',   st:'st-r2',   key:'relay2', on:'on-b', label:'ON'},
+  ];
+  defs.forEach(d => {
+    const btn = document.getElementById(d.id);
+    const val = S[d.key];
+    btn.className  = 'act-btn ' + (val ? d.on : 'off');
+    document.getElementById(d.st).textContent = val ? 'ON' : 'OFF';
+  });
+}
+
+function renderRL() {
+  const r = S.reward;
+  document.getElementById('reward-val').textContent = r.toFixed(2);
+  document.getElementById('reward-val').style.color = r >= 0 ? 'var(--acc3)' : 'var(--acc4)';
+  document.getElementById('reward-bar').style.width = Math.min(100, 50 + r * 30) + '%';
+  document.getElementById('reward-bar').className   = 'bar-fill ' + (r >= 0 ? 'bar-g' : 'bar-w');
+  document.getElementById('rl-state').textContent   = S.rlState;
+  document.getElementById('rl-action').textContent  = ACTIONS[S.rlAction] || '—';
+
+  const tbody = document.getElementById('q-body');
+  tbody.innerHTML = '';
+  S.qTable.forEach((row, s) => {
+    const tr = document.createElement('tr');
+    const tdS = document.createElement('td');
+    tdS.textContent = 's' + s;
+    if (s === S.rlState) tdS.style.color = 'var(--acc)';
+    tr.appendChild(tdS);
+    row.forEach((v, a) => {
+      const td = document.createElement('td');
+      td.textContent = (v >= 0 ? '+' : '') + v.toFixed(2);
+      td.className = v > 0.01 ? 'q-pos' : v < -0.01 ? 'q-neg' : '';
+      if (s === S.rlState && a === S.rlAction) td.classList.add('q-hi');
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function renderTinyML() {
+  const el = document.getElementById('tml-class');
+  el.textContent = CLASSES[S.tmlClass];
+  el.style.color = C_COLORS[S.tmlClass];
+  const segs = document.querySelectorAll('.conf-seg');
+  const lit  = Math.round(S.tmlConf * 10);
+  segs.forEach((seg, i) => {
+    seg.className = 'conf-seg' + (i < lit ? ' lit' : '');
+    if (i < lit) seg.style.background = C_COLORS[S.tmlClass];
+  });
+}
+
+function renderAll() { renderSensors(); renderActuators(); renderRL(); renderTinyML(); }
+
+/* ── MODE ── */
+function setMode(m) {
+  S.mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  const idx = ['nlp','rl','anomaly','tinyml','manual','all'].indexOf(m);
+  if (idx >= 0) document.querySelectorAll('.mode-btn')[idx].classList.add('active');
+  logLine('CMD', 'mode → ' + m.toUpperCase());
+  if (tg) tg.HapticFeedback && tg.HapticFeedback.impactOccurred('light');
+}
+
+/* ── ACTUATOR TOGGLE ── */
+function toggleAct(key) {
+  if (S.mode !== 'manual') {
+    logLine('CMD', 'switch to MANUAL mode to override actuators');
+    if (tg) tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('warning');
+    return;
+  }
+  S[key] = !S[key];
+  renderActuators();
+  logLine('CMD', key + ' → ' + (S[key] ? 'ON' : 'OFF'));
+  if (tg) tg.HapticFeedback && tg.HapticFeedback.impactOccurred('medium');
+
+  // Send to bot via sendData (if opened from bot)
+  if (tg && tg.sendData) {
+    tg.sendData(JSON.stringify({cmd: key, val: S[key]}));
+  }
+}
+
+/* ── REWARD ── */
+function applyReward(r) {
+  S.qTable[S.rlState][S.rlAction] += 0.15 * r;
+  S.reward = r;
+  renderRL();
+  logLine('RL', 'manual reward ' + r + ' applied to s' + S.rlState + ' a' + ACTIONS[S.rlAction]);
+  if (tg) tg.HapticFeedback && tg.HapticFeedback.impactOccurred('light');
+}
+
+/* ── ML ── */
+function relu(x) { return Math.max(0, x); }
+function softmax(v) {
+  const mx = Math.max(...v), e = v.map(x => Math.exp(x - mx)), s = e.reduce((a,b) => a+b, 0);
+  return e.map(x => x / s);
+}
+function tinymlInfer(an, mo, zn) {
+  const W1=[[0.62,-0.41,0.88],[-0.31,0.77,-0.56],[0.15,0.92,0.23],[-0.74,-0.18,0.65]];
+  const B1=[0.1,-0.2,0.05,0.3];
+  const W2=[[0.55,-0.70,0.38,0.22],[-0.43,0.61,-0.29,0.81],[0.77,0.33,-0.60,-0.45],[-0.22,-0.55,0.71,0.36]];
+  const B2=[0.0,0.1,-0.1,0.0];
+  const h = W1.map((row,i) => relu(row.reduce((s,w,j) => s + w*[an,mo,zn][j], B1[i])));
+  const out = W2.map((row,i) => row.reduce((s,w,j) => s + w*h[j], B2[i]));
+  const probs = softmax(out);
+  let cls = 0; probs.forEach((p,i) => { if (p > probs[cls]) cls = i; });
+  return {cls, conf: probs[cls]};
+}
+
+function rlStep() {
+  const mb = S.motion?1:0, ab = S.analog>512?1:0, anb = S.anomaly?1:0;
+  const s = (mb<<2)|(ab<<1)|anb;
+  let a = Math.random()<0.15 ? Math.floor(Math.random()*4) : S.qTable[s].indexOf(Math.max(...S.qTable[s]));
+  let r = 0;
+  if (S.anomaly) r -= 1;
+  if (S.motion && S.ledG) r += 0.5;
+  if (!S.motion && !S.relay1 && !S.relay2) r += 0.3;
+  if (S.ledR && !S.anomaly) r -= 0.2;
+  const maxNext = Math.max(...S.qTable[s]);
+  S.qTable[S.rlState][S.rlAction] += 0.15*(r + 0.9*maxNext - S.qTable[S.rlState][S.rlAction]);
+  S.rlState=s; S.rlAction=a; S.reward=r;
+  const acts=[false,false,false,false]; acts[a]=true;
+  S.ledR=acts[0]; S.ledG=acts[1]; S.relay1=acts[2]; S.relay2=acts[3];
+  logLine('RL', `s=${s} a=${ACTIONS[a]} r=${r.toFixed(2)}`);
+}
+
+/* ── SIMULATION ── */
+let simWin = [];
+function simSensors() {
+  S.analog = Math.max(0, Math.min(1023, S.analog + (Math.random()-.5)*80));
+  S.motion = Math.random() > 0.75;
+  if (Math.random() < 0.05) S.analog = Math.random() > 0.5 ? 950 : 50;
+  simWin.push(S.analog/1023); if (simWin.length > 20) simWin.shift();
+  if (simWin.length >= 5) {
+    const mn = simWin.reduce((a,b)=>a+b,0)/simWin.length;
+    const sd = Math.sqrt(simWin.reduce((a,b)=>a+(b-mn)**2,0)/simWin.length)||0.001;
+    S.zScore  = Math.abs((S.analog/1023 - mn) / sd);
+    S.anomaly = S.zScore > 2.5;
+  }
+}
+
+function simTick() {
+  simSensors();
+  if (S.mode==='all'||S.mode==='rl') rlStep();
+  if (S.mode==='all'||S.mode==='tinyml') {
+    const zn = Math.min(1, S.zScore/5);
+    const r  = tinymlInfer(S.analog/1023, S.motion?1:0, zn);
+    S.tmlClass = r.cls; S.tmlConf = r.conf;
+    if (S.mode==='tinyml') {
+      S.ledR=r.cls===2||r.cls===3; S.ledG=r.cls===1||r.cls===3;
+      S.relay1=r.cls===1||r.cls===3; S.relay2=r.cls===3;
+      logLine('ML', `class=${CLASSES[r.cls]} conf=${(r.conf*100).toFixed(0)}%`);
+    }
+  }
+  if (S.anomaly && (S.mode==='all'||S.mode==='anomaly'))
+    logLine('ANOMALY', `z=${S.zScore.toFixed(2)} analog=${S.analog}`);
+  renderAll();
+}
+
+/* ── NLP ── */
+function recognizeNLP(txt) {
+  const lower = txt.toLowerCase();
+  for (const p of S.patterns) {
+    if (lower.includes(p.kw)) {
+      const m = p.mask;
+      S.ledR=(m>>0)&1; S.ledG=(m>>1)&1; S.relay1=(m>>2)&1; S.relay2=(m>>3)&1;
+      logLine('NLP', `matched "${p.kw}" → mask ${m.toString(2).padStart(4,'0')}`);
+      return true;
+    }
+  }
+  return false;
+}
+
+/* ── CMD ── */
+function sendCmd() {
+  const inp = document.getElementById('cmd');
+  const raw = inp.value.trim(); if (!raw) return;
+  inp.value = '';
+  logLine('CMD', '> ' + raw);
+  const c = raw.toLowerCase();
+  if (c==='status')    { logLine('SYS',`analog=${S.analog} motion=${S.motion} z=${S.zScore.toFixed(2)} mode=${S.mode}`); return; }
+  if (c==='help')      { logLine('SYS','mode [nlp|rl|anomaly|tinyml|manual|all], led r/g on/off, relay 1/2 on/off, reward <n>'); return; }
+  if (c==='rl reset')  { S.qTable=Array.from({length:8},()=>Array(4).fill(0)); logLine('RL','Q-table reset'); return; }
+  if (c.startsWith('reward ')) { applyReward(parseFloat(c.slice(7))); return; }
+  if (c.startsWith('mode '))   { setMode(c.slice(5)); return; }
+  if (c==='led r on')    { S.ledR=true;   renderActuators(); return; }
+  if (c==='led r off')   { S.ledR=false;  renderActuators(); return; }
+  if (c==='led g on')    { S.ledG=true;   renderActuators(); return; }
+  if (c==='led g off')   { S.ledG=false;  renderActuators(); return; }
+  if (c==='relay 1 on')  { S.relay1=true; renderActuators(); return; }
+  if (c==='relay 1 off') { S.relay1=false;renderActuators(); return; }
+  if (c==='relay 2 on')  { S.relay2=true; renderActuators(); return; }
+  if (c==='relay 2 off') { S.relay2=false;renderActuators(); return; }
+  if (c.startsWith('learn: ')) {
+    const arrow = c.indexOf('→');
+    if (arrow > 7) { S.patterns.push({kw:c.slice(7,arrow).trim(), mask:parseInt(c.slice(arrow+1))}); logLine('NLP','pattern learned'); }
+    return;
+  }
+  if (!recognizeNLP(raw)) logLine('CMD','unknown — try "help"');
+  renderAll();
+}
+
+/* ── KEYBOARD ENTER ── */
+document.getElementById('cmd').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); sendCmd(); }
+});
+
+/* ── BOOT ── */
+setInterval(simTick, 1200);
+renderAll();
+logLine('SYS', 'EVRES ML Brain dashboard initialized');
+logLine('NLP', '6 patterns loaded');
+logLine('RL',  'Q-table ready (8 states × 4 actions)');
+logLine('ML',  'TinyML perceptron ready (2 layers)');
+</script>
+</body>
+</html>
